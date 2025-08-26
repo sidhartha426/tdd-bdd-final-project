@@ -28,10 +28,12 @@ import os
 import logging
 from decimal import Decimal
 from unittest import TestCase
+from flask import abort
 from service import app
 from service.common import status
 from service.models import db, init_db, Product
 from tests.factories import ProductFactory
+
 
 # Disable all but critical errors during normal test run
 # uncomment for debugging failing tests
@@ -60,6 +62,11 @@ class TestProductRoutes(TestCase):
         app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
         app.logger.setLevel(logging.CRITICAL)
         init_db(app)
+
+        @app.route('/trigger_error')
+        def trigger_error():
+            # Abort the request and trigger a 500 error
+            abort(status.HTTP_500_INTERNAL_SERVER_ERROR, "Some server error occured")
 
     @classmethod
     def tearDownClass(cls):
@@ -167,6 +174,13 @@ class TestProductRoutes(TestCase):
     # ADD YOUR TEST CASES HERE
     #
 
+    def test_error_handlers(self):
+        """It should generate a 500 server error"""
+        response = self.client.get("/trigger_error")
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        response = self.client.post(f"{BASE_URL}/10", json={"message": "Hi"})
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
     def test_get_product(self):
         """It should Get a single Product"""
         # get the id of a product
@@ -179,7 +193,6 @@ class TestProductRoutes(TestCase):
         invalid_id = test_product.id + 1
         response = self.client.get(f"{BASE_URL}/{invalid_id}")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
 
     ######################################################################
     # Utility functions
