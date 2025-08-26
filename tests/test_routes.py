@@ -159,6 +159,8 @@ class TestProductRoutes(TestCase):
         logging.debug("Product no name: %s", new_product)
         response = self.client.post(BASE_URL, json=new_product)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        data = response.get_json()
+        self.assertEqual(data["message"], "Invalid product: missing name")
 
     def test_create_product_no_content_type(self):
         """It should not Create a Product with no Content-Type"""
@@ -170,12 +172,45 @@ class TestProductRoutes(TestCase):
         response = self.client.post(BASE_URL, data={}, content_type="plain/text")
         self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
+    def test_create_product_wrong_available_attribute(self):
+        """It should not Create a Product with wrong available attribute"""
+        test_product = ProductFactory()
+        test_product.available = "false"
+        logging.debug("Test Product: %s", test_product.serialize())
+        response = self.client.post(BASE_URL, json=test_product.serialize())
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        data = response.get_json()
+        self.assertEqual(data["message"], "Invalid type for boolean [available]: <class 'str'>")
+
+    def test_create_product_wrong_category_attribute(self):
+        """It should not Create a Product with wrong category attribute"""
+        test_product = ProductFactory().serialize()
+        test_product["category"] = "SKIBBDI"
+        logging.debug("Test Product: %s", test_product)
+        response = self.client.post(BASE_URL, json=test_product)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        data = response.get_json()
+        self.assertEqual(data["message"], "Invalid attribute: SKIBBDI")
+
+    def test_create_product_with_a_none_value(self):
+        """It should not Create a Product with None value of attributes"""
+        test_product = ProductFactory().serialize()
+        test_product["price"] = None
+        logging.debug("Test Product: %s", test_product)
+        response = self.client.post(BASE_URL, json=test_product)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        data = response.get_json()
+        self.assertEqual(
+            data["message"],
+            "Invalid product: body of request contained bad or no data conversion from NoneType to Decimal is not supported"
+            )
+
     #
     # ADD YOUR TEST CASES HERE
     #
 
     def test_error_handlers(self):
-        """It should generate a 500 server error"""
+        """It should generate appropriate error"""
         response = self.client.get("/trigger_error")
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         response = self.client.post(f"{BASE_URL}/10", json={"message": "Hi"})
@@ -193,6 +228,8 @@ class TestProductRoutes(TestCase):
         invalid_id = test_product.id + 1
         response = self.client.get(f"{BASE_URL}/{invalid_id}")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        data = response.get_json()
+        self.assertEqual(data["message"], f"404 Not Found: Product with id '{invalid_id}' was not found.")
 
     ######################################################################
     # Utility functions
