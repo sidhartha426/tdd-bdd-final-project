@@ -86,6 +86,7 @@ class TestProductModel(unittest.TestCase):
         """It should Create a product and add it to the database"""
         products = Product.all()
         self.assertEqual(products, [])
+        self.assertEqual(len(products), 0)
         product = ProductFactory()
         product.id = None
         product.create()
