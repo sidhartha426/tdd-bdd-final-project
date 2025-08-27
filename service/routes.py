@@ -20,7 +20,7 @@ Product Store Service with UI
 """
 from flask import jsonify, request, abort
 from flask import url_for  # noqa: F401 pylint: disable=unused-import
-from service.models import Product
+from service.models import Product, Category
 from service.common import status  # HTTP Status Codes
 from . import app
 
@@ -42,10 +42,11 @@ def index():
     """Base URL for our service"""
     return app.send_static_file("index.html")
 
-
 ######################################################################
 #  U T I L I T Y   F U N C T I O N S
 ######################################################################
+
+
 def check_content_type(content_type):
     """Checks that the media type is correct"""
     if "Content-Type" not in request.headers:
@@ -64,10 +65,11 @@ def check_content_type(content_type):
         f"Content-Type must be {content_type}",
     )
 
-
 ######################################################################
 # C R E A T E   A   N E W   P R O D U C T
 ######################################################################
+
+
 @app.route("/products", methods=["POST"])
 def create_products():
     """
@@ -95,14 +97,42 @@ def create_products():
 
 
 ######################################################################
-# L I S T   A L L   P R O D U C T S
+# L I S T   P R O D U C T S
 ######################################################################
+
 
 @app.route("/products", methods=["GET"])
 def list_products():
     """Returns a list of Products"""
     app.logger.info("Request to list Products...")
-    products = Product.all()
+
+    products = []
+    name = request.args.get("name")
+    category = request.args.get("category")
+    available = request.args.get("available")
+    price = request.args.get("price")
+
+    if name:
+        app.logger.info("Find by name: %s", name)
+        products = Product.find_by_name(name)
+    elif category:
+        app.logger.info("Find by category: %s", category)
+        # create enum from string
+        category_value = getattr(Category, category.upper())
+        products = Product.find_by_category(category_value)
+    elif available:
+        app.logger.info("Find by available: %s", available)
+        # create bool from string
+        available_value = available.lower() in ["true", "yes", "1"]
+        products = Product.find_by_availability(available_value)
+    elif price:
+        app.logger.info("Find by price: %s", price)
+        # create bool from string
+        products = Product.find_by_price(price)
+    else:
+        app.logger.info("Find all")
+        products = Product.all()
+
     results = [product.serialize() for product in products]
     app.logger.info("[%s] Products returned", len(results))
     return results, status.HTTP_200_OK
@@ -110,6 +140,7 @@ def list_products():
 ######################################################################
 # R E A D   A   P R O D U C T
 ######################################################################
+
 
 @app.route("/products/<int:product_id>", methods=["GET"])
 def get_products(product_id):
@@ -131,6 +162,7 @@ def get_products(product_id):
 # U P D A T E   A   P R O D U C T
 ######################################################################
 
+
 @app.route("/products/<int:product_id>", methods=["PUT"])
 def update_products(product_id):
     """
@@ -148,13 +180,14 @@ def update_products(product_id):
     data = request.get_json()
     product.deserialize(data)
     product.update()
-    
+
     app.logger.info("Returning product: %s", product.name)
     return product.serialize(), status.HTTP_200_OK
 
 ######################################################################
 # D E L E T E   A   P R O D U C T
 ######################################################################
+
 
 @app.route("/products/<int:product_id>", methods=["DELETE"])
 def delete_products(product_id):
